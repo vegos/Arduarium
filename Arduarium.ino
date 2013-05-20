@@ -34,7 +34,7 @@ char* MenuItems[5] = { "Set Temperature ",      // 0
 // ---- Keypad pins: 2, 3, 4, 5, 6, 7, 8, 9 ----
 
 byte rowPins[rows] = {5, 4, 3, 2}; //connect to the row pinouts of the keypad
-byte colPins[cols] = {9, 8, 7, 6}; //connect to the column pinouts of the keypad
+byte colPins[cols] = {8, 7, 6, 9}; //connect to the column pinouts of the keypad
 
 Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, rows, cols );
 
@@ -62,13 +62,30 @@ void setup()
   Buzzer = ReadFromEEPROM(2);
   FanStatus = ReadFromEEPROM(4);
   PumpStatus = ReadFromEEPROM(6);
+  for (int i=0; i<5; i++)
+  {
+    digitalWrite(LEDPin, HIGH);
+    delay(100);
+    digitalWrite(LEDPin, LOW);
+    delay(100);
+  }
   Serial.begin(9600);
   Serial.println("Arduarium Started!");
   Serial.print("Buzzer: ");
-  Serial.println(Buzzer);
+  if (Buzzer)
+    Serial.println("Enabled");
+  else
+    Serial.println("Disabled");
   Serial.print("Fan: ");
-  Serial.println(FanStatus);
-  Serial.println("");
+  if (FanStatus)
+    Serial.println("Enabled");
+  else
+    Serial.println("Disabled");
+  Serial.print("Pump: ");
+  if (PumpStatus)
+    Serial.println("Enabled");
+  else
+    Serial.println("Disabled");
 }
 
 
@@ -82,6 +99,8 @@ void loop()
 // ---
   if (key != NO_KEY)
   {
+    Serial.print("Key: ");
+    Serial.println(key);
     StayInside = true;
     lcd.clear();
     lcd.print("Menu");
@@ -96,6 +115,7 @@ void loop()
       {
         lcd.setCursor(0,1);
         lcd.print(MenuItems[MenuSelection]);
+        key = keypad.getKey();
         switch (key)
         {
           case '*':                        // LEFT
