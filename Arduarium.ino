@@ -50,7 +50,7 @@ Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, rows, cols );
 
 float CurrentTemp = 0;
 volatile int TempThreshold = 30;
-boolean FanStatus = false, PumpStatus = false, WaterLevel = false, Buzzer = false, StayInside = true, FanEnabled = false, PumpEnabled = false, Backlight=true;
+boolean FanStatus = false, PumpStatus = false, WaterLevel = false, Buzzer = false, StayInside = true, FanEnabled = false, PumpEnabled = false, Backlight=true, PumpActive = true, FanActive = true;
 
 long UpdateMillis;
 
@@ -65,6 +65,7 @@ void setup()
   keypad.setHoldTime(30);
   pinMode(BuzzerPin, OUTPUT);
   pinMode(LEDPin, OUTPUT);
+  digitalWrite(LEDPin, HIGH);
   pinMode(FanPin, OUTPUT);
   pinMode(PumpPin, OUTPUT);
   digitalWrite(FanPin, HIGH);    // Set relays to off, as when not powered
@@ -93,20 +94,13 @@ void setup()
   else
     Buzzer = false;
   if (ReadFromEEPROM(4)==1)
-    FanStatus = true;
+    FanActive = true;
   else
-    FanStatus = false;
+    FanActive = false;
   if (ReadFromEEPROM(6)==1)
-    PumpStatus = true;
+    PumpActive = true;
   else
-    PumpStatus = false;
-  for (int i=0; i<5; i++)
-  {
-    digitalWrite(LEDPin, HIGH);
-    delay(100);
-    digitalWrite(LEDPin, LOW);
-    delay(100);
-  }
+    PumpActive = false;
   if (Debug)
   {
     Serial.begin(9600);
@@ -143,6 +137,7 @@ void setup()
    Serial.println("Started!");
    UpdateMillis=millis();
   }
+  digitalWrite(LEDPin, LOW);  
   InitializeScreen();
 }
 
@@ -244,48 +239,55 @@ void loop()
   }
 // ---  
   
-  if (Temperature()>=TempThreshold)
+  if (FanActive)
   {
-    FanStatus = true;
-    if (!FanEnabled)
+    if (Temperature()>=TempThreshold)
     {
-      digitalWrite(FanPin, LOW);
-      digitalWrite(LEDPin, HIGH);
-      FanEnabled = true;
-      Beep(1);
+      FanStatus = true;
+      if (!FanEnabled)
+      {
+        digitalWrite(FanPin, LOW);
+        digitalWrite(LEDPin, HIGH);
+        FanEnabled = true;
+        Beep(1);
+      }
     }
-  }
-  else
-  {
-    FanStatus = false;
-    if (FanEnabled)
+    else
     {
-      digitalWrite(FanPin, HIGH);
-      digitalWrite(LEDPin, LOW);
-      FanEnabled = false;
-      Beep(2);
+      FanStatus = false;
+      if (FanEnabled)
+      {
+        digitalWrite(FanPin, HIGH);
+        digitalWrite(LEDPin, LOW);
+        FanEnabled = false;
+        Beep(2);
+      }
     }
-  }
-  if (PumpReading())
+  }  
+  
+  if (PumpActive)
   {
-    PumpStatus = true;
-    if (!PumpEnabled)
+    if (PumpReading())
     {
-      digitalWrite(PumpPin, LOW);
-      digitalWrite(LEDPin, HIGH);
-      PumpEnabled = true;
-      Beep(1);
+      PumpStatus = true;
+      if (!PumpEnabled)
+      {
+        digitalWrite(PumpPin, LOW);
+        digitalWrite(LEDPin, HIGH);
+        PumpEnabled = true;
+        Beep(1);
+      }
     }
-  }
-  else
-  {
-    PumpStatus = false;
-    if (PumpEnabled)
+    else
     {
-      digitalWrite(PumpPin, HIGH);
-      digitalWrite(LEDPin, LOW);
-      PumpEnabled = false;
-      Beep(2);
+      PumpStatus = false;
+      if (PumpEnabled)
+      {
+       digitalWrite(PumpPin, HIGH);
+        digitalWrite(LEDPin, LOW);
+       PumpEnabled = false;
+       Beep(2);
+      }
     }
   }
 
@@ -389,8 +391,8 @@ void EnterMenu(int x)
   int tmpTempThreshold = TempThreshold;
   int tmpDigit1 = (tmpTempThreshold/10), tmpDigit2 = (tmpTempThreshold % 10), tmpCurrentDigit=0;
   boolean tmpBuzzer = Buzzer;
-  boolean tmpPumpEnabled = PumpEnabled;
-  boolean tmpFanEnabled = FanEnabled;
+  boolean tmpPumpActive = PumpEnabled;
+  boolean tmpFanActive = FanEnabled;
   boolean tmpBacklight = Backlight;
   char KeyRead;
   boolean waitforkey = true;
@@ -596,7 +598,7 @@ void EnterMenu(int x)
       lcd.setCursor(0,1);
       //         0123456789012345
       lcd.print("Fan:            ");
-      tmpFanEnabled=FanEnabled;
+      tmpFanActive=FanActive;
       waitforkey = true;
       while (waitforkey)
       {
@@ -604,14 +606,14 @@ void EnterMenu(int x)
         switch (KeyRead)
         {
           case '*':
-            tmpFanEnabled = !(tmpFanEnabled);
+            tmpFanActive = !(tmpFanActive);
             break;
           case '#':
-            tmpFanEnabled = !(tmpFanEnabled);
+            tmpFanActive = !(tmpFanActive);
             break;
           case 'A':
-            FanEnabled = tmpFanEnabled;
-            if (FanEnabled)
+            FanEnabled = tmpFanActive;
+            if (FanActive)
               SaveToEEPROM(4,1);
             else
               SaveToEEPROM(4,0);
@@ -624,7 +626,7 @@ void EnterMenu(int x)
             break;
         }
         lcd.setCursor(5,1);
-        if (tmpFanEnabled)
+        if (tmpFanActive)
           lcd.print("ON ");
         else
           lcd.print("OFF");
@@ -640,7 +642,7 @@ void EnterMenu(int x)
       lcd.setCursor(0,1);
       //         0123456789012345
       lcd.print("Pump:           ");
-      tmpPumpEnabled=PumpEnabled;
+      tmpPumpActive=PumpActive;
       waitforkey = true;
       while (waitforkey)
       {
@@ -648,14 +650,14 @@ void EnterMenu(int x)
         switch (KeyRead)
         {
           case '*':
-            tmpPumpEnabled = !(tmpPumpEnabled);
+            tmpPumpActive = !(tmpPumpActive);
             break;
           case '#':
-            tmpPumpEnabled = !(tmpPumpEnabled);
+            tmpPumpActive = !(tmpPumpActive);
             break;
           case 'A':
-            PumpEnabled = tmpPumpEnabled;
-            if (PumpEnabled)
+            PumpActive = tmpPumpActive;
+            if (PumpActive)
               SaveToEEPROM(6,1);
             else
               SaveToEEPROM(6,0);
@@ -668,7 +670,7 @@ void EnterMenu(int x)
             break;
         }
         lcd.setCursor(6,1);
-        if (tmpPumpEnabled)
+        if (tmpPumpActive)
           lcd.print("ON ");
         else
           lcd.print("OFF");
