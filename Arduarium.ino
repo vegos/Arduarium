@@ -2,7 +2,11 @@
 #include <LiquidCrystal_I2C.h>
 #include <Keypad.h>
 #include <EEPROM.h>
+#include <MemoryFree.h>
 
+
+#define  Version  "   0.01 alpha"
+//                 01234567890123456
 
 
 LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars and 2 line display
@@ -24,11 +28,13 @@ char keys[rows][cols] = {
   {'*','0','#','D'}
 };
 //                    0123456789012345
-char* MenuItems[5] = { "Set Temperature ",      // 0
+char* MenuItems[6] = { "Set Temperature ",      // 0
                        "Set Buzzer      ",      // 1
                        "Set Fan         ",      // 2
                        "Set Pump        ",      // 3
-                       "Exit            " };    // 4
+                       "Set Backlight   ",      // 4
+                       "Information     " };    // 5
+                       
 
 
 // ---- Keypad pins: 2, 3, 4, 5, 6, 7, 8, 9 ----
@@ -44,7 +50,7 @@ Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, rows, cols );
 
 float CurrentTemp = 0;
 volatile int TempThreshold = 30;
-boolean FanStatus = false, PumpStatus = false, WaterLevel = false, Buzzer = false, StayInside = true, FanEnabled = false, PumpEnabled = false;
+boolean FanStatus = false, PumpStatus = false, WaterLevel = false, Buzzer = false, StayInside = true, FanEnabled = false, PumpEnabled = false, Backlight=true;
 
 
 #define    Debug    true
@@ -60,8 +66,22 @@ void setup()
   pinMode(BuzzerPin, OUTPUT);
   pinMode(LEDPin, OUTPUT);
   lcd.init();                      // initialize the lcd 
-  lcd.backlight();
-  InitializeScreen();
+  if (ReadFromEEPROM(8)==1)
+  {
+    lcd.backlight();
+    Backlight=true;
+  }
+  else
+  {
+    lcd.noBacklight();
+    Backlight=false;
+  }
+  lcd.clear();
+  //         0123456789012345
+  lcd.print("   Arduarium");
+  lcd.setCursor(0,1);
+  lcd.print("    WELCOME");
+  delay(1000);
   TempThreshold = ReadFromEEPROM(0);
   if (ReadFromEEPROM(2)==1)
     Buzzer = true;
@@ -82,30 +102,42 @@ void setup()
     digitalWrite(LEDPin, LOW);
     delay(100);
   }
-  Serial.begin(9600);
-  Serial.println("Arduarium Started!");
-  Serial.println("");
-  Serial.print("Current Temperature: ");
-  Serial.print(CurrentTemp);
-  Serial.println("C");
-  Serial.print("Temperature Threshold: ");
-  Serial.print(TempThreshold);
-  Serial.println("C");
-  Serial.print("Buzzer: ");
-  if (Buzzer)
-    Serial.println("Enabled");
-  else
-    Serial.println("Disabled");
-  Serial.print("Fan: ");
-  if (FanStatus)
-    Serial.println("Enabled");
-  else
-    Serial.println("Disabled");
-  Serial.print("Pump: ");
-  if (PumpStatus)
-    Serial.println("Enabled");
-  else
-    Serial.println("Disabled");
+  if (Debug)
+  {
+    Serial.begin(9600);
+    Serial.println("Arduarium Started!");
+    Serial.println("");
+    Serial.print("Current Temperature: ");
+    Serial.print(CurrentTemp);
+    Serial.println("C");
+    Serial.print("Temperature Threshold: ");
+    Serial.print(TempThreshold);
+    Serial.println("C");
+    Serial.print("Buzzer: ");
+    if (Buzzer)
+      Serial.println("Enabled");
+    else
+      Serial.println("Disabled");
+    Serial.print("Fan: ");
+    if (FanStatus)
+      Serial.println("Enabled");
+    else
+      Serial.println("Disabled");
+    Serial.print("Pump: ");
+    if (PumpStatus)
+      Serial.println("Enabled");
+   else
+      Serial.println("Disabled");
+   Serial.print("LCD Backlight: ");
+   if (Backlight)
+     Serial.println("Enabled");
+   else
+     Serial.println("Disabled");
+     
+   Serial.println("");
+   Serial.println("Started!");
+  }
+  InitializeScreen();
 }
 
 
@@ -117,48 +149,65 @@ void loop()
 {
   char key = keypad.getKey();
 // ---
-  if (key != NO_KEY)
+  if (key == 'A')    // We have a keypress  - A - Entering Menu
   {
-    Serial.print("Key: ");
-    Serial.println(key);
     StayInside = true;
+    int MenuSelection = 0;
     lcd.clear();
     lcd.print("Menu");
-    lcd.setCursor(0,1);
-    //         0123456789012345
-    lcd.print("Set Temperature ");
-    
-    if (key == 'A')                        // ENTER MENU
+    while (StayInside)
     {
-      int MenuSelection = 0;
-      while (StayInside)
+      lcd.setCursor(0,1);
+      lcd.print(MenuItems[MenuSelection]);
+      key = keypad.getKey();
+      switch (key)
       {
-        lcd.setCursor(0,1);
-        lcd.print(MenuItems[MenuSelection]);
-        key = keypad.getKey();
-        switch (key)
-        {
-          case '*':                        // LEFT
-            MenuSelection -= 1;
-            if (MenuSelection < 0)
-              MenuSelection = 4;
-            break;
-          case '#':                        // RIGHT
-            MenuSelection += 1;
-            if (MenuSelection > 4)
-              MenuSelection = 0;
-            break;
-          case 'A':                        // ENTER
-            EnterMenu(MenuSelection);
-            InitializeScreen();
-            break;
-          case 'D':                        // EXIT
-            StayInside = false;
-            InitializeScreen();
-            break;
-        }
+        case '*':                        // LEFT
+          MenuSelection -= 1;
+          if (MenuSelection < 0)
+            MenuSelection = 5;
+          break;
+        case '#':                        // RIGHT
+          MenuSelection += 1;
+          if (MenuSelection > 5)
+            MenuSelection = 0;
+          break;
+        case 'A':                        // ENTER MENU
+          EnterMenu(MenuSelection);
+          InitializeScreen();
+          break;
+        case 'D':                        // EXIT
+          StayInside = false;
+          InitializeScreen();
+          break;
       }
     }
+  }
+  if (key == 'B')
+  {
+    if (Backlight)
+    {
+      lcd.noBacklight();
+      Backlight=false;
+    }
+    else
+    {
+      lcd.backlight();
+      Backlight=true;
+    }
+  }
+  
+  if (key == 'C')
+  {
+    lcd.clear();
+    //         0123456789012345
+    lcd.print("  Manual Mode   ");
+    lcd.setCursor(0,1);
+    lcd.print("  FAN ENABLED   ");
+    digitalWrite(FanPin, HIGH);
+    while (keypad.getKey()!='C') {};
+    digitalWrite(FanPin, LOW);
+    InitializeScreen();
   }
 // ---  
   
@@ -236,7 +285,7 @@ void loop()
   {
     CurrentTemp = Temperature();
     lcd.setCursor(6,0);
-    lcd.print(CurrentTemp,1);
+    lcd.print(CurrentTemp,2);
   }
 }
 
@@ -291,10 +340,10 @@ void InitializeScreen()
 {
   lcd.clear();
   //         0123456789012345
-  lcd.print("Temp:     C     ");
+  lcd.print("Temp:      C    ");
   lcd.setCursor(0,1);
   lcd.print("Fan:    Pump:   ");
-  CurrentTemp = Temperature()-1;  
+  CurrentTemp = Temperature()-1;
 }
 
 
@@ -309,6 +358,7 @@ void EnterMenu(int x)
   boolean tmpBuzzer = Buzzer;
   boolean tmpPumpEnabled = PumpEnabled;
   boolean tmpFanEnabled = FanEnabled;
+  boolean tmpBacklight = Backlight;
   char KeyRead;
   boolean waitforkey = true;
   switch (x)
@@ -449,8 +499,10 @@ void EnterMenu(int x)
             TempThreshold = tmpTempThreshold;
             waitforkey = false;
             SaveToEEPROM(0,TempThreshold);
+            Beep(1);
             break;
           case 'D':
+            Beep(2);
             waitforkey = false;          
             break;
         }
@@ -489,8 +541,10 @@ void EnterMenu(int x)
             else
               SaveToEEPROM(2,0);            
             waitforkey = false;
+            Beep(1);
             break;
           case 'D':
+            Beep(2);
             waitforkey = false;
             break;
         }
@@ -529,12 +583,14 @@ void EnterMenu(int x)
             else
               SaveToEEPROM(4,0);
             waitforkey = false;
+            Beep(1);
             break;
           case 'D':
+            Beep(2);
             waitforkey = false;
             break;
         }
-        lcd.setCursor(4,1);
+        lcd.setCursor(5,1);
         if (tmpFanEnabled)
           lcd.print("ON ");
         else
@@ -571,12 +627,14 @@ void EnterMenu(int x)
             else
               SaveToEEPROM(6,0);
             waitforkey = false;
+            Beep(1);
             break;
           case 'D':
+            Beep(2);
             waitforkey = false;
             break;
         }
-        lcd.setCursor(5,1);
+        lcd.setCursor(6,1);
         if (tmpPumpEnabled)
           lcd.print("ON ");
         else
@@ -585,8 +643,79 @@ void EnterMenu(int x)
       StayInside = false;      
       break;
 
-    case 4: 
+      
+    case 4:
+      lcd.clear();
+      lcd.print(MenuItems[4]);
+      lcd.setCursor(0,1);
+      //         0123456789012345
+      lcd.print("Backlight:      ");
+      tmpBacklight=Backlight;
+      waitforkey = true;
+      while (waitforkey)
+      {
+        KeyRead = keypad.getKey();
+        switch (KeyRead)
+        {
+          case '*':
+            tmpBacklight = !(tmpBacklight);
+            break;
+          case '#':
+            tmpBacklight = !(tmpBacklight);
+            break;
+          case 'A':
+            Beep(1);
+            Backlight=tmpBacklight;
+            if (Backlight)
+            {
+              SaveToEEPROM(8,1);
+              lcd.backlight();
+            }
+            else
+            {
+              SaveToEEPROM(8,0);
+              lcd.noBacklight();
+            }
+            waitforkey = false;
+            break;
+          case 'D':
+            Beep(2);
+            waitforkey = false;
+            break;
+        }
+        lcd.setCursor(11,1);
+        if (tmpBacklight)
+          lcd.print("ON ");
+        else
+          lcd.print("OFF");
+      }    
       StayInside = false;      
+      break;
+
+
+
+    case 5:
+      lcd.clear();
+      //         0123456789012345
+      lcd.print("    (c) 2013    ");
+      lcd.setCursor(0,1);
+      lcd.print("Antonis Maglaras");
+      while (keypad.getKey() == NO_KEY) {};
+      lcd.clear();
+      //         0123456789012345
+      lcd.print("    Version");
+      lcd.setCursor(0,1);
+      lcd.print(Version);
+      while (keypad.getKey() == NO_KEY) {};
+      lcd.clear();
+      lcd.print("Free Memory");
+      lcd.setCursor(0,1);
+      //         0123456789012345
+      lcd.print(freeMemory());
+      lcd.print(" bytes");
+      while (keypad.getKey() == NO_KEY) {};
+      StayInside = false;    
+      Beep(2);  
       break; 
   }  
 }
