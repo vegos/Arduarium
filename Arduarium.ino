@@ -11,12 +11,12 @@
 
 LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars and 2 line display
 
-#define TemperaturePin   A0
-#define WaterLevelPin    A1
-#define LEDPin           13
-#define BuzzerPin        11
-#define FanPin           A2
-#define PumpPin          A3
+#define TemperaturePin   A0  // Temperature Sensor
+#define WaterLevelPin    A1  // Water Sensor
+#define LEDPin           13  // LED
+#define BuzzerPin        11  // Buzzer
+#define FanPin           A2  // Fan -> Relay
+#define PumpPin          A3  // Pump -> Relay
 
 
 const byte rows = 4; //four rows
@@ -52,6 +52,7 @@ float CurrentTemp = 0;
 volatile int TempThreshold = 30;
 boolean FanStatus = false, PumpStatus = false, WaterLevel = false, Buzzer = false, StayInside = true, FanEnabled = false, PumpEnabled = false, Backlight=true;
 
+long UpdateMillis;
 
 #define    Debug    true
 
@@ -62,9 +63,13 @@ boolean FanStatus = false, PumpStatus = false, WaterLevel = false, Buzzer = fals
 void setup()
 {
   keypad.setHoldTime(30);
-  pinMode(PumpPin, INPUT_PULLUP);
   pinMode(BuzzerPin, OUTPUT);
   pinMode(LEDPin, OUTPUT);
+  pinMode(FanPin, OUTPUT);
+  pinMode(PumpPin, OUTPUT);
+  digitalWrite(FanPin, HIGH);    // Set relays to off, as when not powered
+  digitalWrite(PumpPin, HIGH);   //
+  pinMode(WaterLevelPin, INPUT_PULLUP);
   lcd.init();                      // initialize the lcd 
   if (ReadFromEEPROM(8)==1)
   {
@@ -136,6 +141,7 @@ void setup()
      
    Serial.println("");
    Serial.println("Started!");
+   UpdateMillis=millis();
   }
   InitializeScreen();
 }
@@ -149,6 +155,31 @@ void loop()
 {
   char key = keypad.getKey();
 // ---
+
+
+  if (Debug)
+  {
+    if (millis()-UpdateMillis>5000)
+    {
+      Serial.println("- Update:");
+      Serial.print("  Temperature: ");
+      Serial.print(CurrentTemp);
+      Serial.println("C");
+      Serial.print("  Fan Status: ");
+      if (FanStatus)
+        Serial.println("Enabled");
+      else
+        Serial.println("Disabled");
+      Serial.print("  Pump Status: ");
+      if (PumpStatus)
+        Serial.println("Enabled");
+      else
+        Serial.println("Disabled");
+      UpdateMillis=millis();
+    }
+  }
+
+
   if (key == 'A')    // We have a keypress  - A - Entering Menu
   {
     StayInside = true;
@@ -204,9 +235,11 @@ void loop()
     lcd.print("  Manual Mode   ");
     lcd.setCursor(0,1);
     lcd.print("  FAN ENABLED   ");
-    digitalWrite(FanPin, HIGH);
-    while (keypad.getKey()!='C') {};
     digitalWrite(FanPin, LOW);
+    while (keypad.getKey()!='C') {};
+    digitalWrite(FanPin, HIGH);
+    FanEnabled = false;
+    FanStatus = false;
     InitializeScreen();
   }
 // ---  
@@ -216,7 +249,7 @@ void loop()
     FanStatus = true;
     if (!FanEnabled)
     {
-      digitalWrite(FanPin, HIGH);
+      digitalWrite(FanPin, LOW);
       digitalWrite(LEDPin, HIGH);
       FanEnabled = true;
       Beep(1);
@@ -227,7 +260,7 @@ void loop()
     FanStatus = false;
     if (FanEnabled)
     {
-      digitalWrite(FanPin, LOW);
+      digitalWrite(FanPin, HIGH);
       digitalWrite(LEDPin, LOW);
       FanEnabled = false;
       Beep(2);
@@ -238,7 +271,7 @@ void loop()
     PumpStatus = true;
     if (!PumpEnabled)
     {
-      digitalWrite(PumpPin, HIGH);
+      digitalWrite(PumpPin, LOW);
       digitalWrite(LEDPin, HIGH);
       PumpEnabled = true;
       Beep(1);
@@ -249,7 +282,7 @@ void loop()
     PumpStatus = false;
     if (PumpEnabled)
     {
-      digitalWrite(PumpPin, LOW);
+      digitalWrite(PumpPin, HIGH);
       digitalWrite(LEDPin, LOW);
       PumpEnabled = false;
       Beep(2);
@@ -306,7 +339,7 @@ float Temperature()
 
 boolean PumpReading()
 {
-  if (digitalRead(PumpPin)==HIGH)
+  if (digitalRead(WaterLevelPin)==HIGH)
     return true;
   else
     return false;
