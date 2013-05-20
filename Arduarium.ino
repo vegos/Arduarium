@@ -10,7 +10,9 @@ LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars
 #define TemperaturePin   A0
 #define WaterLevelPin    A1
 #define LEDPin           13
-#define BuzzerPin        12
+#define BuzzerPin        11
+#define FanPin            9
+#define PumpPin          10
 
 
 const byte rows = 4; //four rows
@@ -39,19 +41,40 @@ Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, rows, cols );
 
 float CurrentTemp = 0;
 volatile int TempThreshold = 30;
-boolean FanStatus = false, PumpStatus = false, WaterLevel = false, Buzzer = false, StayInside = true, FanEnabled = true, PumpEnabled = true;
+boolean FanStatus = false, PumpStatus = false, WaterLevel = false, Buzzer = false, StayInside = true, FanEnabled = false, PumpEnabled = false;
 
+
+#define    Debug    true
+
+
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Setup / Initialize Procedure
 
 void setup()
 {
+  pinMode(PumpPin, INPUT_PULLUP);
+  pinMode(BuzzerPin, OUTPUT);
+  pinMode(LEDPin, OUTPUT);
   lcd.init();                      // initialize the lcd 
   lcd.backlight();
   InitializeScreen();
   TempThreshold = ReadFromEEPROM(0);
   Buzzer = ReadFromEEPROM(2);
-  FanEnabled = ReadFromEEPROM(4);
-  PumpEnabled = ReadFromEEPROM(6);
+  FanStatus = ReadFromEEPROM(4);
+  PumpStatus = ReadFromEEPROM(6);
+  Serial.begin(9600);
+  Serial.println("Arduarium Started!");
+  Serial.print("Buzzer: ");
+  Serial.println(Buzzer);
+  Serial.print("Fan: ");
+  Serial.println(FanStatus);
+  Serial.println("");
 }
+
+
+
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Main Procedure
 
 void loop()
 {
@@ -99,23 +122,51 @@ void loop()
   }
 // ---  
   
-  if (Temperature()>TempThreshold)
+  if (Temperature()>=TempThreshold)
   {
     FanStatus = true;
+    if (!FanEnabled)
+    {
+      digitalWrite(FanPin, HIGH);
+      digitalWrite(LEDPin, HIGH);
+      FanEnabled = true;
+      Beep(1);
+    }
   }
   else
   {
     FanStatus = false;
+    if (FanEnabled)
+    {
+      digitalWrite(FanPin, LOW);
+      digitalWrite(LEDPin, LOW);
+      FanEnabled = false;
+      Beep(2);
+    }
   }
-  if (WaterLevel)
+  if (PumpReading())
   {
     PumpStatus = true;
+    if (!PumpEnabled)
+    {
+      digitalWrite(PumpPin, HIGH);
+      digitalWrite(LEDPin, HIGH);
+      PumpEnabled = true;
+      Beep(1);
+    }
   }
   else
   {
     PumpStatus = false;
+    if (PumpEnabled)
+    {
+      digitalWrite(PumpPin, LOW);
+      digitalWrite(LEDPin, LOW);
+      PumpEnabled = false;
+      Beep(2);
+    }
   }
-  
+
   
   if (FanStatus)
   {
@@ -149,6 +200,11 @@ void loop()
   }
 }
 
+
+
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Read temperature from sensor
+
 float Temperature()
 {
   int Reading=analogRead(TemperaturePin);
@@ -157,6 +213,20 @@ float Temperature()
   float Output = (TempC - 0.5) * 100;
   return Output;  
 }
+
+
+boolean PumpReading()
+{
+  if (digitalRead(PumpPin)==HIGH)
+    return true;
+  else
+    return false;
+}
+
+
+
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Make Sounds
 
 void Beep(int x)
 {
@@ -174,6 +244,9 @@ void Beep(int x)
 
 
 
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Clear Screen / Standby mode
+
 void InitializeScreen()
 {
   lcd.clear();
@@ -184,6 +257,10 @@ void InitializeScreen()
   CurrentTemp = Temperature()-1;  
 }
 
+
+
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Main Menu / Settings
 
 void EnterMenu(int x)
 {
@@ -461,6 +538,9 @@ void EnterMenu(int x)
 
 
 
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Write to EEPROM
+
 void SaveToEEPROM(int addr, int number)
 {
   int a = number/256;
@@ -468,6 +548,11 @@ void SaveToEEPROM(int addr, int number)
   EEPROM.write(addr,a);
   EEPROM.write(addr+1,b);
 }  
+
+
+
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Read from EEPROM
 
 int ReadFromEEPROM(int addr)
 {
