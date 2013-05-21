@@ -27,7 +27,8 @@ https://picasaweb.google.com/104656736936976952947/Arduarium
 Video:
 ------
 
-https://www.youtube.com/watch?v=qXi-ZNG_N1o
+http://www.youtube.com/watch?v=CcVkWe7an_k
+
 (Temperature sensor is not installed --  that's the reasing for the weird results)
 
 
