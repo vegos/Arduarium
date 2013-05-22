@@ -5,7 +5,7 @@
 #include <MemoryFree.h>
 
 
-#define  Version  "     1.23b"
+#define  Version  "     1.25b"
 
 LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars and 2 line display
 
@@ -23,17 +23,6 @@ char keys[rows][cols] = {
   {'4','5','6','B'},
   {'7','8','9','C'},
   {'*','0','#','D'}
-};
-
-byte cel[8] = {              // Degrees custom sign symbol for use on LCD
-  B01100,
-  B10010,
-  B10010,
-  B01100,
-  B00000,
-  B00000,
-  B00000,
-  B00000
 };
 
 char* MenuItems[8] = { "Set Temperature ",      // 0
@@ -83,7 +72,6 @@ void setup()
   digitalWrite(FanPin, HIGH);              // Set relay to off, as when not powered
   digitalWrite(PumpPin, HIGH);             // Set relay to off, as when not powered
   pinMode(WaterLevelPin, INPUT_PULLUP);    // Water Level Sensor pin
-  lcd.createChar(1, cel);                  // Create custom character for LCD
   lcd.init();                              // Initialize LCD
   if (ReadFromEEPROM(8)==1)
   {
@@ -366,7 +354,14 @@ void loop()
   {
     CurrentTemp = Temperature();
     lcd.setCursor(6,0);
-    lcd.print(CurrentTemp,1);
+    if (CurrentTemp > 99)
+      lcd.print("ERROR!");
+    else
+    {
+      if (CurrentTemp<10)
+        lcd.print("0");
+      lcd.print(CurrentTemp,1);
+    }
   }
 }
 
@@ -441,7 +436,7 @@ void InitializeScreen()
 {
   lcd.clear();
   lcd.print("Temp:     ");
-  lcd.write(1);
+  lcd.print(char(223));
   lcd.print("C    ");
   lcd.setCursor(0,1);
   lcd.print("Fan:    Pump:   ");
