@@ -16,8 +16,8 @@ LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars
 #define FanPin           A2  // Fan -> Relay
 #define PumpPin          A3  // Pump -> Relay
 
-const byte rows = 4; //four rows
-const byte cols = 4; //three columns
+const byte rows = 4;         // Four rows
+const byte cols = 4;         // Four columns
 char keys[rows][cols] = {
   {'1','2','3','A'},
   {'4','5','6','B'},
@@ -25,7 +25,7 @@ char keys[rows][cols] = {
   {'*','0','#','D'}
 };
 
-byte cel[8] = {            // degrees sign
+byte cel[8] = {              // Degrees custom sign symbol for use on LCD
   B01100,
   B10010,
   B10010,
@@ -76,15 +76,15 @@ void setup()
   else
     Debug = false;
   keypad.setHoldTime(20);
-  pinMode(BuzzerPin, OUTPUT);
-  pinMode(LEDPin, OUTPUT);
-  pinMode(FanPin, OUTPUT);
-  pinMode(PumpPin, OUTPUT);
-  digitalWrite(FanPin, HIGH);              // Set relays to off, as when not powered
-  digitalWrite(PumpPin, HIGH);             // 
-  pinMode(WaterLevelPin, INPUT_PULLUP);    
-  lcd.createChar(1, cel);
-  lcd.init();                              
+  pinMode(BuzzerPin, OUTPUT);              // Buzzer
+  pinMode(LEDPin, OUTPUT);                 // LED
+  pinMode(FanPin, OUTPUT);                 // Fan Relay
+  pinMode(PumpPin, OUTPUT);                // Pump Relay
+  digitalWrite(FanPin, HIGH);              // Set relay to off, as when not powered
+  digitalWrite(PumpPin, HIGH);             // Set relay to off, as when not powered
+  pinMode(WaterLevelPin, INPUT_PULLUP);    // Water Level Sensor pin
+  lcd.createChar(1, cel);                  // Create custom character for LCD
+  lcd.init();                              // Initialize LCD
   if (ReadFromEEPROM(8)==1)
   {
     lcd.backlight();
@@ -113,15 +113,17 @@ void setup()
   if (Debug)
   {
     Serial.begin(9600);
-    Serial.println("Arduarium Started!");
+    Serial.println("  Arduarium Started!");
+    Serial.print("");
+    Serial.println(Version);
     Serial.println("");
-    Serial.print("Current Temperature: ");
+    Serial.print("  Current Temperature: ");
     Serial.print(Temperature());
     Serial.println("C");
-    Serial.print("Temperature Alert: ");
+    Serial.print("  Temperature Alert: ");
     Serial.print(TempThreshold);
     Serial.println("C");
-    Serial.print("Buzzer: ");
+    Serial.print("  Buzzer: ");
     if (Buzzer==0)
       Serial.println("Disabled");
     else
@@ -130,24 +132,24 @@ void setup()
       Serial.print(Buzzer);
       Serial.println(" beeps)");
     }
-    Serial.print("Fan: ");
+    Serial.print("  Fan: ");
     if (FanStatus)
       Serial.println("Enabled");
     else
       Serial.println("Disabled");
-    Serial.print("Pump: ");
+    Serial.print("  Pump: ");
     if (PumpStatus)
       Serial.println("Enabled");
    else
       Serial.println("Disabled");
-   Serial.print("LCD Backlight: ");
+   Serial.print("  LCD Backlight: ");
    if (Backlight)
      Serial.println("Enabled");
    else
      Serial.println("Disabled");
      
    Serial.println("");
-   Serial.println("Started!");
+   Serial.println("Ready!");
    UpdateMillis=millis();
   }
   digitalWrite(LEDPin, LOW);  
@@ -265,7 +267,7 @@ void loop()
     InitializeScreen();
   }
   
-  if (FanActive)
+  if (FanActive)                               // If fan is enabled
   {
     if (abs(Temperature())>=TempThreshold)
     {
@@ -303,7 +305,7 @@ void loop()
     }
   }  
   
-  if (PumpActive)
+  if (PumpActive)                              // If pump is enabled
   {
     if (PumpReading())
     {
@@ -335,6 +337,9 @@ void loop()
     }
   }
 
+
+  // Displaying on LCD the status / temperature / etc
+  
   if (FanStatus)
   {
     lcd.setCursor(4,1);
@@ -345,6 +350,7 @@ void loop()
     lcd.setCursor(4,1);
     lcd.print("OFF");
   }
+
   if (PumpStatus)
   {
     lcd.setCursor(13,1);
@@ -355,6 +361,7 @@ void loop()
     lcd.setCursor(13,1);
     lcd.print("OFF");
   }
+
   if (Temperature() != CurrentTemp)
   {
     CurrentTemp = Temperature();
@@ -689,9 +696,9 @@ void EnterMenu(int x)
         }
         lcd.setCursor(5,1);
         if (tmpBoolean)
-          lcd.print("Active    ");
+          lcd.print("Enabled ");
         else
-          lcd.print("Not Active");
+          lcd.print("Disabled");
       }      
       StayInside = false;      
       break;
@@ -730,9 +737,9 @@ void EnterMenu(int x)
         }
         lcd.setCursor(6,1);
         if (tmpBoolean)
-          lcd.print("Active    ");
+          lcd.print("Enabled ");
         else
-          lcd.print("Not Active");
+          lcd.print("Disabled");
       }    
       StayInside = false;      
       break;
