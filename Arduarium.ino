@@ -764,7 +764,7 @@ void EnterMenu(int x)
       
     case 4:
       lcd.clear();
-      lcd.print(MenuItems[1]);
+      lcd.print(MenuItems[4]);
       lcd.setCursor(0,1);
       lcd.print("Overfill for   ");
       lcd.print(char(0x22));
