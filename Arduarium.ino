@@ -4,8 +4,8 @@
 #include <EEPROM.h>
 #include <MemoryFree.h>
 
+#define  Version  "     1.30b"
 
-#define  Version  "     1.25b"
 
 LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars and 2 line display
 
@@ -25,14 +25,15 @@ char keys[rows][cols] = {
   {'*','0','#','D'}
 };
 
-char* MenuItems[8] = { "Set Temperature ",      // 0
+char* MenuItems[9] = { "Set Temperature ",      // 0
                        "Set Buzzer      ",      // 1
                        "Set Fan         ",      // 2
                        "Set Pump        ",      // 3
-                       "Set Backlight   ",      // 4
-                       "Set Serial port ",      // 5
-                       "Factory Reset   ",      // 6
-                       "Information     " };    // 7          
+                       "Set Overfill    ",      // 4
+                       "Set Backlight   ",      // 5
+                       "Set Serial port ",      // 6
+                       "Factory Reset   ",      // 7
+                       "Information     " };    // 8          
 
 byte rowPins[rows] = { 2, 3, 4, 6 };
 byte colPins[cols] = { 5, 7, 8, 9 };
@@ -52,6 +53,7 @@ boolean FanStatus = false,
         FanActive = true;
 long UpdateMillis;
 volatile boolean Debug = true;
+int OverFillDelay = 0;
 
 
 
@@ -98,6 +100,7 @@ void setup()
     PumpActive = true;
   else
     PumpActive = false;
+  OverFillDelay = ReadFromEEPROM(12);
   if (Debug)
   {
     Serial.begin(9600);
@@ -130,6 +133,9 @@ void setup()
       Serial.println("Enabled");
    else
       Serial.println("Disabled");
+   Serial.print("  Water Pump Overfill Delay: ");
+   Serial.print(OverFillDelay);
+   Serial.println(" seconds");
    Serial.print("  LCD Backlight: ");
    if (Backlight)
      Serial.println("Enabled");
@@ -191,11 +197,11 @@ void loop()
         case '*':                              // LEFT
           MenuSelection -= 1;
           if (MenuSelection < 0)
-            MenuSelection = 7;
+            MenuSelection = 8;
           break;
         case '#':                              // RIGHT
           MenuSelection += 1;
-          if (MenuSelection > 7)
+          if (MenuSelection > 8)
             MenuSelection = 0;
           break;
         case 'A':                              // ENTER MENU
@@ -257,7 +263,7 @@ void loop()
   
   if (FanActive)                               // If fan is enabled
   {
-    if (abs(Temperature())>=TempThreshold)
+    if ((abs(Temperature())>=TempThreshold) && (Temperature()<=99))
     {
       FanStatus = true;
       if (!FanEnabled)
@@ -315,9 +321,18 @@ void loop()
       if (PumpEnabled)
       {
         if (Debug)
-          Serial.println("Water level is normal. De-activating Pump!");
+        {
+          Serial.print("Water level is normal. De-activating Pump in ");
+          Serial.print(OverFillDelay);
+          Serial.println(" seconds.");
+        }
         if (PumpActive)
+        {
+          delay(OverFillDelay);
           digitalWrite(PumpPin, HIGH);
+        }
+        if (Debug)
+          Serial.println("Pump de-activated.");
         digitalWrite(LEDPin, LOW);
        PumpEnabled = false;
        Beep(2);
@@ -739,9 +754,60 @@ void EnterMenu(int x)
       StayInside = false;      
       break;
       
+      
+      
+      
+      
+      
+      
+      
+      
     case 4:
       lcd.clear();
-      lcd.print(MenuItems[4]);
+      lcd.print(MenuItems[1]);
+      lcd.setCursor(0,1);
+      lcd.print("Overfill for   ");
+      lcd.print(char(0x22));
+      
+      tmpInteger=OverFillDelay;
+      waitforkey = true;
+      while (waitforkey)
+      {
+        KeyRead = keypad.getKey();
+        switch (KeyRead)
+        {
+          case '*':
+            tmpInteger -= 1;
+            if (tmpInteger<0)
+              tmpInteger=30;
+            break;
+          case '#':
+            tmpInteger += 1;
+            if (tmpInteger>30)
+              tmpInteger=0;
+            break;
+          case 'A':
+            OverFillDelay = tmpInteger;
+            WriteToEEPROM(12,OverFillDelay);
+            SavedMessage();
+            waitforkey = false;
+            break;
+          case 'D':
+            NotSavedMessage();            
+            waitforkey = false;
+            break;
+        }
+        lcd.setCursor(13,1);
+        if (tmpInteger<10)
+          lcd.print("0");
+        lcd.print(tmpInteger);
+      }
+      StayInside = false;      
+      break;
+      
+    case 5:
+      lcd.clear();
+      lcd.print(MenuItems[5]);
       lcd.setCursor(0,1);
       lcd.print("Backlight:      ");
       tmpBoolean=Backlight;
@@ -786,9 +852,9 @@ void EnterMenu(int x)
       StayInside = false;      
       break;
 
-    case 5:
+    case 6:
       lcd.clear();
-      lcd.print(MenuItems[5]);
+      lcd.print(MenuItems[6]);
       lcd.setCursor(0,1);
       lcd.print("Serial:         ");
       tmpBoolean=Debug;
@@ -827,9 +893,9 @@ void EnterMenu(int x)
       StayInside = false;      
       break;
 
-    case 6:
+    case 7:
       lcd.clear();
-      lcd.print(MenuItems[6]);
+      lcd.print(MenuItems[7]);
       lcd.setCursor(0,1);
       lcd.print("Are you sure?   ");
       Beep(3);
@@ -848,6 +914,7 @@ void EnterMenu(int x)
             WriteToEEPROM(6,1);
             WriteToEEPROM(8,1);
             WriteToEEPROM(10,0);
+            WriteToEEPROM(12,0);
             delay(1500);            
             Beep(3);
             waitforkey = false;
@@ -864,7 +931,7 @@ void EnterMenu(int x)
       StayInside = false;      
       break;
         
-    case 7:
+    case 8:
       lcd.clear();
       lcd.print("    (c) 2013    ");
       lcd.setCursor(0,1);
