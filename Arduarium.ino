@@ -4,7 +4,7 @@
 #include <EEPROM.h>
 #include <MemoryFree.h>
 
-#define  Version  "     1.30b"
+#define  Version  "     1.33b"
 
 
 LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars and 2 line display
@@ -15,6 +15,8 @@ LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars
 #define BuzzerPin        11  // Buzzer
 #define FanPin           A2  // Fan -> Relay
 #define PumpPin          A3  // Pump -> Relay
+
+#define TempERROR        60  // Temperatures more than this equals to error
 
 const byte rows = 4;         // Four rows
 const byte cols = 4;         // Four columns
@@ -104,46 +106,47 @@ void setup()
   if (Debug)
   {
     Serial.begin(9600);
-    Serial.println("  Arduarium Started!");
+    Serial.println("- Arduarium Started!");
     Serial.print("");
     Serial.println(Version);
     Serial.println("");
     Serial.print("  Current Temperature: ");
     Serial.print(Temperature());
     Serial.println("C");
-    Serial.print("  Temperature Alert: ");
+    Serial.print("  Temperature Alert at ");
     Serial.print(TempThreshold);
     Serial.println("C");
-    Serial.print("  Buzzer: ");
+    Serial.print("  Buzzer is ");
     if (Buzzer==0)
       Serial.println("Disabled");
     else
     {
-      Serial.print("Enabled (");
+      Serial.print("Enabled (for ");
       Serial.print(Buzzer);
       Serial.println(" beeps)");
     }
-    Serial.print("  Fan: ");
+    Serial.print("  Fan is ");
     if (FanStatus)
       Serial.println("Enabled");
     else
       Serial.println("Disabled");
-    Serial.print("  Pump: ");
+    Serial.print("  Pump is ");
     if (PumpStatus)
       Serial.println("Enabled");
    else
       Serial.println("Disabled");
-   Serial.print("  Water Pump Overfill Delay: ");
+   Serial.print("  Water Pump Overfill time for ");
    Serial.print(OverFillDelay);
    Serial.println(" seconds");
-   Serial.print("  LCD Backlight: ");
+   Serial.print("  LCD Backlight is ");
    if (Backlight)
      Serial.println("Enabled");
    else
      Serial.println("Disabled");
      
    Serial.println("");
-   Serial.println("Ready!");
+   Serial.println("- Ready!");
+   Serial.println("");
    UpdateMillis=millis();
   }
   digitalWrite(LEDPin, LOW);  
@@ -163,19 +166,19 @@ void loop()
     if (millis()-UpdateMillis>5000)
     {
       Serial.println("- Update:");
-      Serial.print("  Temperature: ");
+      Serial.print("  Current Temperature: ");
       Serial.print(CurrentTemp);
       Serial.println("C");
       Serial.print("  Fan Status: ");
       if (FanStatus)
-        Serial.println("Enabled");
+        Serial.println("ON");
       else
-        Serial.println("Disabled");
+        Serial.println("OFF");
       Serial.print("  Pump Status: ");
       if (PumpStatus)
-        Serial.println("Enabled");
+        Serial.println("ON");
       else
-        Serial.println("Disabled");
+        Serial.println("OFF");
       UpdateMillis=millis();
     }
   }
@@ -263,7 +266,7 @@ void loop()
   
   if (FanActive)                               // If fan is enabled
   {
-    if ((abs(Temperature())>=TempThreshold) && (Temperature()<=99))
+    if ((abs(Temperature())>=TempThreshold) && (Temperature()<=TempERROR))
     {
       FanStatus = true;
       if (!FanEnabled)
@@ -369,7 +372,7 @@ void loop()
   {
     CurrentTemp = Temperature();
     lcd.setCursor(6,0);
-    if (CurrentTemp > 99)
+    if (CurrentTemp > TempERROR)
       lcd.print("ERROR!");
     else
     {
@@ -936,18 +939,18 @@ void EnterMenu(int x)
       lcd.print("    (c) 2013    ");
       lcd.setCursor(0,1);
       lcd.print("Antonis Maglaras");
-      while (keypad.getKey() == NO_KEY) {};
+      WaitForKeypress()
       lcd.clear();
       lcd.print("    Version     ");
       lcd.setCursor(0,1);
       lcd.print(Version);
-      while (keypad.getKey() == NO_KEY) {};
+      WaitForKeypress()
       lcd.clear();
       lcd.print("Free Memory");
       lcd.setCursor(0,1);
       lcd.print(freeMemory());
       lcd.print(" bytes");
-      while (keypad.getKey() == NO_KEY) {};
+      WaitForKeypress()
       StayInside = false;    
       Beep(2);  
       break; 
@@ -961,10 +964,8 @@ void EnterMenu(int x)
 
 void WriteToEEPROM(int addr, int number)
 {
-  int a = number/256;
-  int b = number % 256;
-  EEPROM.write(addr,a);
-  EEPROM.write(addr+1,b);
+  EEPROM.write(addr,(number / 256));
+  EEPROM.write(addr+1,(number % 256));
 }  
 
 
@@ -1001,4 +1002,14 @@ void SavedMessage()
   lcd.print("     SAVED!     ");
   Beep(1);
   delay(1000);
+}
+
+
+
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Wait for keypress
+
+void WaitForKeypress()
+{
+  while (keypad.getKey() == NO_KEY) {};  
 }
