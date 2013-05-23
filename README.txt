@@ -74,7 +74,10 @@ threshold is an integer. When comparing, the Arduarium checks for the
 absolute values (e.g. 29.9 is not equal to 30, but 30.1 and 30.9 is equal 
 to 30).
 
-For water level sensor, you can use any NC (normally-closed) switch.
+For water level sensor, you can use any NC (normally-closed) switch. There
+is also an option to set the overfill time. It's prefered to overfill for
+a couple of seconds, so the pump will working less times a day, but for
+more period. Just find the sweet spot. 
 
 
 
