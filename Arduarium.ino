@@ -939,18 +939,18 @@ void EnterMenu(int x)
       lcd.print("    (c) 2013    ");
       lcd.setCursor(0,1);
       lcd.print("Antonis Maglaras");
-      WaitForKeypress()
+      WaitForKeypress();
       lcd.clear();
       lcd.print("    Version     ");
       lcd.setCursor(0,1);
       lcd.print(Version);
-      WaitForKeypress()
+      WaitForKeypress();
       lcd.clear();
       lcd.print("Free Memory");
       lcd.setCursor(0,1);
       lcd.print(freeMemory());
       lcd.print(" bytes");
-      WaitForKeypress()
+      WaitForKeypress();
       StayInside = false;    
       Beep(2);  
       break; 
