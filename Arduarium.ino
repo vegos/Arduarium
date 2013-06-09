@@ -4,7 +4,7 @@
 #include <EEPROM.h>
 #include <MemoryFree.h>
 
-#define  Version  "     1.33b"
+#define  Version  "     1.34b"
 
 
 LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars and 2 line display
@@ -331,7 +331,7 @@ void loop()
         }
         if (PumpActive)
         {
-          delay(OverFillDelay);
+          delay(OverFillDelay*1000);
           digitalWrite(PumpPin, HIGH);
         }
         if (Debug)
