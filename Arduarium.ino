@@ -4,7 +4,7 @@
 #include <EEPROM.h>
 #include <MemoryFree.h>
 
-#define  Version  "     1.34b"
+#define  Version  "     1.40b"
 
 
 LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars and 2 line display
@@ -42,7 +42,7 @@ byte colPins[cols] = { 5, 7, 8, 9 };
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, rows, cols);
 
-float CurrentTemp = 0;
+int Sum,Total,CorrectedTemperature, CurrentTemp = 0;
 volatile int TempThreshold = 30, Buzzer=0;
 boolean FanStatus = false, 
         PumpStatus = false, 
@@ -53,7 +53,7 @@ boolean FanStatus = false,
         Backlight=true, 
         PumpActive = true, 
         FanActive = true;
-long UpdateMillis;
+long UpdateMillis, SampleMillis;
 volatile boolean Debug = true;
 int OverFillDelay = 0;
 
@@ -266,7 +266,7 @@ void loop()
   
   if (FanActive)                               // If fan is enabled
   {
-    if ((abs(Temperature())>=TempThreshold) && (Temperature()<=TempERROR))
+    if ((CorrectedTemperature>=TempThreshold) && (CorrectedTemperature<=TempERROR))
     {
       FanStatus = true;
       if (!FanEnabled)
@@ -274,7 +274,7 @@ void loop()
         if (Debug)
         {
           Serial.print("Temperature is ");
-          Serial.print(abs(Temperature()));
+          Serial.print(abs(CorrectedTemperature));
           Serial.println("C - Activating Fan!");
         }
         digitalWrite(FanPin, LOW);
@@ -291,7 +291,7 @@ void loop()
         if (Debug)
         {
           Serial.print("Temperature is ");
-          Serial.print(abs(Temperature()));
+          Serial.print(abs(CorrectedTemperature));
           Serial.println("C - De-activating Fan!");
         }
         digitalWrite(FanPin, HIGH);
@@ -331,7 +331,14 @@ void loop()
         }
         if (PumpActive)
         {
-          delay(OverFillDelay*1000);
+          if (OverFillDelay!=0)
+          {
+            lcd.setCursor(0,1);
+            lcd.print("Overfilling...  ");
+            Beep(1);
+            delay(OverFillDelay*1000);
+            InitializeScreen();
+          }
           digitalWrite(PumpPin, HIGH);
         }
         if (Debug)
@@ -368,12 +375,15 @@ void loop()
     lcd.print("OFF");
   }
 
-  if (Temperature() != CurrentTemp)
+  Total+=Temperature();
+  Sum+=1;
+  CorrectedTemperature=Sum/Total;
+  if (CorrectedTemperature != CurrentTemp)
   {
-    CurrentTemp = Temperature();
+    CurrentTemp = CorrectedTemperature;
     lcd.setCursor(6,0);
     if (CurrentTemp > TempERROR)
-      lcd.print("ERROR!");
+      lcd.print("ER");
     else
     {
       if (CurrentTemp<10)
@@ -381,6 +391,12 @@ void loop()
       lcd.print(CurrentTemp,1);
     }
   }
+  if (millis()-SampleMillis>1000)
+  {
+    Total=0;
+    Sum=0;
+    SampleMillis=millis();
+  }  
 }
 
 
@@ -388,9 +404,9 @@ void loop()
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Read temperature from sensor
 
-float Temperature()
+int Temperature()
 {
-  float TempC =  ((((analogRead(TemperaturePin) * 5.0) / 1024.0) - 0.5)*100.0);
+  int TempC =  ((analogRead(TemperaturePin) * 5.0 * 100.0) / 1024.0);
   return TempC;  
 }
 
