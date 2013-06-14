@@ -4,7 +4,7 @@
 #include <EEPROM.h>
 #include <MemoryFree.h>
 
-#define  Version  "     1.40b"
+#define  Version  "     1.51b"
 
 
 LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars and 2 line display
@@ -135,7 +135,7 @@ void setup()
       Serial.println("Enabled");
    else
       Serial.println("Disabled");
-   Serial.print("  Water Pump Overfill time for ");
+   Serial.print("  Overfill/Overcool time for ");
    Serial.print(OverFillDelay);
    Serial.println(" seconds");
    Serial.print("  LCD Backlight is ");
@@ -166,8 +166,8 @@ void loop()
     if (millis()-UpdateMillis>5000)
     {
       Serial.println("- Update:");
-      Serial.print("  Current Temperature: ");
-      Serial.print(CurrentTemp);
+      Serial.print("  Corrected Temperature: ");
+      Serial.print(CorrectedTemperature);
       Serial.println("C");
       Serial.print("  Fan Status: ");
       if (FanStatus)
@@ -293,6 +293,8 @@ void loop()
           Serial.print("Temperature is ");
           Serial.print(abs(CorrectedTemperature));
           Serial.println("C - De-activating Fan!");
+          if (OverFillDelay!=0)
+            delay(OverFillDelay*1000);
         }
         digitalWrite(FanPin, HIGH);
         digitalWrite(LEDPin, LOW);
@@ -375,20 +377,20 @@ void loop()
     lcd.print("OFF");
   }
 
-  Total+=Temperature();
-  Sum+=1;
+  Total+=1;
+  Sum+=Temperature();
   CorrectedTemperature=Sum/Total;
   if (CorrectedTemperature != CurrentTemp)
   {
     CurrentTemp = CorrectedTemperature;
     lcd.setCursor(6,0);
-    if (CurrentTemp > TempERROR)
+    if (CorrectedTemperature > TempERROR)
       lcd.print("ER");
     else
     {
-      if (CurrentTemp<10)
+      if (CorrectedTemperature<10)
         lcd.print("0");
-      lcd.print(CurrentTemp,1);
+      lcd.print(CorrectedTemperature,1);
     }
   }
   if (millis()-SampleMillis>1000)
@@ -469,12 +471,12 @@ void AlertSound()
 void InitializeScreen()
 {
   lcd.clear();
-  lcd.print("Temp:     ");
+  lcd.print("Temp:   ");
   lcd.print(char(223));
   lcd.print("C    ");
   lcd.setCursor(0,1);
   lcd.print("Fan:    Pump:   ");
-  CurrentTemp = Temperature()-1;
+  CurrentTemp = CorrectedTemperature-1;
 }
 
 
