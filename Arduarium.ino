@@ -4,7 +4,7 @@
 #include <EEPROM.h>
 #include <MemoryFree.h>
 
-#define  Version  "     1.51b"
+#define  Version  "     2.00b"
 
 
 LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars and 2 line display
@@ -32,8 +32,8 @@ char* MenuItems[9] = { "Set Temperature ",      // 0
                        "Set Fan         ",      // 2
                        "Set Pump        ",      // 3
                        "Set Overfill    ",      // 4
-                       "Set Backlight   ",      // 5
-                       "Set Serial port ",      // 6
+                       "Set Temp Drop   ",      // 5
+                       "Set Backlight   ",      // 6
                        "Factory Reset   ",      // 7
                        "Information     " };    // 8          
 
@@ -42,8 +42,8 @@ byte colPins[cols] = { 5, 7, 8, 9 };
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, rows, cols);
 
-int Sum,Total,CorrectedTemperature, CurrentTemp = 0;
-volatile int TempThreshold = 30, Buzzer=0;
+int Sum,Total,CorrectedDisplayTemp, DisplayTemp = 0;
+volatile int TempThreshold = 30, Buzzer=0, TemperatureDrop=0;
 boolean FanStatus = false, 
         PumpStatus = false, 
         WaterLevel = false, 
@@ -53,8 +53,7 @@ boolean FanStatus = false,
         Backlight=true, 
         PumpActive = true, 
         FanActive = true;
-long UpdateMillis, SampleMillis;
-volatile boolean Debug = true;
+long SampleMillis;
 int OverFillDelay = 0;
 
 
@@ -64,10 +63,6 @@ int OverFillDelay = 0;
 
 void setup()
 {
-  if (ReadFromEEPROM(10)==1)
-    Debug = true;
-  else
-    Debug = false;
   keypad.setHoldTime(20);
   pinMode(BuzzerPin, OUTPUT);              // Buzzer
   pinMode(LEDPin, OUTPUT);                 // LED
@@ -102,53 +97,8 @@ void setup()
     PumpActive = true;
   else
     PumpActive = false;
+  TemperatureDrop = ReadFromEEPROM(10);
   OverFillDelay = ReadFromEEPROM(12);
-  if (Debug)
-  {
-    Serial.begin(9600);
-    Serial.println("- Arduarium Started!");
-    Serial.print("");
-    Serial.println(Version);
-    Serial.println("");
-    Serial.print("  Current Temperature: ");
-    Serial.print(Temperature());
-    Serial.println("C");
-    Serial.print("  Temperature Alert at ");
-    Serial.print(TempThreshold);
-    Serial.println("C");
-    Serial.print("  Buzzer is ");
-    if (Buzzer==0)
-      Serial.println("Disabled");
-    else
-    {
-      Serial.print("Enabled (for ");
-      Serial.print(Buzzer);
-      Serial.println(" beeps)");
-    }
-    Serial.print("  Fan is ");
-    if (FanStatus)
-      Serial.println("Enabled");
-    else
-      Serial.println("Disabled");
-    Serial.print("  Pump is ");
-    if (PumpStatus)
-      Serial.println("Enabled");
-   else
-      Serial.println("Disabled");
-   Serial.print("  Overfill/Overcool time for ");
-   Serial.print(OverFillDelay);
-   Serial.println(" seconds");
-   Serial.print("  LCD Backlight is ");
-   if (Backlight)
-     Serial.println("Enabled");
-   else
-     Serial.println("Disabled");
-     
-   Serial.println("");
-   Serial.println("- Ready!");
-   Serial.println("");
-   UpdateMillis=millis();
-  }
   digitalWrite(LEDPin, LOW);  
   InitializeScreen();
 }
@@ -161,28 +111,6 @@ void setup()
 void loop()
 {
   char key = keypad.getKey();
-  if (Debug)
-  {
-    if (millis()-UpdateMillis>5000)
-    {
-      Serial.println("- Update:");
-      Serial.print("  Corrected Temperature: ");
-      Serial.print(CorrectedTemperature);
-      Serial.println("C");
-      Serial.print("  Fan Status: ");
-      if (FanStatus)
-        Serial.println("ON");
-      else
-        Serial.println("OFF");
-      Serial.print("  Pump Status: ");
-      if (PumpStatus)
-        Serial.println("ON");
-      else
-        Serial.println("OFF");
-      UpdateMillis=millis();
-    }
-  }
-
 
   if (key == 'A')                              // We have a keypress  - A - Entering Menu
   {
@@ -266,18 +194,12 @@ void loop()
   
   if (FanActive)                               // If fan is enabled
   {
-    if ((CorrectedTemperature>=TempThreshold) && (CorrectedTemperature<=TempERROR))
+    if ((CorrectedDisplayTemp>=TempThreshold) && (CorrectedDisplayTemp<=TempERROR))
     {
       FanStatus = true;
       if (!FanEnabled)
       {
-        if (Debug)
-        {
-          Serial.print("Temperature is ");
-          Serial.print(abs(CorrectedTemperature));
-          Serial.println("C - Activating Fan!");
-        }
-        digitalWrite(FanPin, LOW);
+        digitalWrite(FanPin, LOW);             // Turn ON fan
         digitalWrite(LEDPin, HIGH);
         FanEnabled = true;
         AlertSound();
@@ -285,24 +207,19 @@ void loop()
     }
     else
     {
-      FanStatus = false;
-      if (FanEnabled)
+      if (CorrectedDisplayTemp>=(TempThreshold+1))
       {
-        if (Debug)
+        FanStatus = false;
+        if (FanEnabled)
         {
-          Serial.print("Temperature is ");
-          Serial.print(abs(CorrectedTemperature));
-          Serial.println("C - De-activating Fan!");
-          if (OverFillDelay!=0)
-            delay(OverFillDelay*1000);
+          digitalWrite(FanPin, HIGH);            // Turn OFF fan
+          digitalWrite(LEDPin, LOW);
+          FanEnabled = false;
+          Beep(2);
         }
-        digitalWrite(FanPin, HIGH);
-        digitalWrite(LEDPin, LOW);
-        FanEnabled = false;
-        Beep(2);
       }
     }
-  }  
+  }
   
   if (PumpActive)                              // If pump is enabled
   {
@@ -311,8 +228,6 @@ void loop()
       PumpStatus = true;
       if (!PumpEnabled)
       {
-        if (Debug)
-          Serial.println("Water level is LOW. Activating Pump!");
         if (PumpActive)
           digitalWrite(PumpPin, LOW);
         digitalWrite(LEDPin, HIGH);
@@ -325,12 +240,6 @@ void loop()
       PumpStatus = false;
       if (PumpEnabled)
       {
-        if (Debug)
-        {
-          Serial.print("Water level is normal. De-activating Pump in ");
-          Serial.print(OverFillDelay);
-          Serial.println(" seconds.");
-        }
         if (PumpActive)
         {
           if (OverFillDelay!=0)
@@ -343,8 +252,6 @@ void loop()
           }
           digitalWrite(PumpPin, HIGH);
         }
-        if (Debug)
-          Serial.println("Pump de-activated.");
         digitalWrite(LEDPin, LOW);
        PumpEnabled = false;
        Beep(2);
@@ -379,18 +286,18 @@ void loop()
 
   Total+=1;
   Sum+=Temperature();
-  CorrectedTemperature=Sum/Total;
-  if (CorrectedTemperature != CurrentTemp)
+  CorrectedDisplayTemp=Sum/Total;
+  if (CorrectedDisplayTemp != DisplayTemp)
   {
-    CurrentTemp = CorrectedTemperature;
+    DisplayTemp = CorrectedDisplayTemp;
     lcd.setCursor(6,0);
-    if (CorrectedTemperature > TempERROR)
+    if (CorrectedDisplayTemp > TempERROR)
       lcd.print("ER");
     else
     {
-      if (CorrectedTemperature<10)
+      if (CorrectedDisplayTemp<10)
         lcd.print("0");
-      lcd.print(CorrectedTemperature,1);
+      lcd.print(CorrectedDisplayTemp,1);
     }
   }
   if (millis()-SampleMillis>1000)
@@ -476,7 +383,7 @@ void InitializeScreen()
   lcd.print("C    ");
   lcd.setCursor(0,1);
   lcd.print("Fan:    Pump:   ");
-  CurrentTemp = CorrectedTemperature-1;
+  DisplayTemp = CorrectedDisplayTemp-1;
 }
 
 
@@ -825,10 +732,55 @@ void EnterMenu(int x)
       }
       StayInside = false;      
       break;
-      
+
+
+
     case 5:
       lcd.clear();
       lcd.print(MenuItems[5]);
+      //         0123456789012345
+      lcd.print("Temp Drop:   ");
+      lcd.print(char(223));
+      lcd.print("C ");
+      tmpInteger=TemperatureDrop;
+      waitforkey = true;
+      while (waitforkey)
+      {
+        KeyRead = keypad.getKey();
+        switch (KeyRead)
+        {
+          case '*':
+            tmpInteger -= 1;
+            if (tmpInteger<0)
+              tmpInteger=10;
+            break;
+          case '#':
+            tmpInteger += 1;
+            if (tmpInteger>10)
+              tmpInteger=0;
+            break;
+          case 'A':
+            TemperatureDrop = tmpInteger;
+            WriteToEEPROM(10,TemperatureDrop);
+            SavedMessage();
+            waitforkey = false;
+            break;
+          case 'D':
+            NotSavedMessage();            
+            waitforkey = false;
+            break;
+        }
+        lcd.setCursor(10,1);
+        if (tmpInteger<10)
+          lcd.print("0");
+        lcd.print(tmpInteger);
+      }
+      StayInside = false;      
+      break;
+      
+    case 6:
+      lcd.clear();
+      lcd.print(MenuItems[6]);
       lcd.setCursor(0,1);
       lcd.print("Backlight:      ");
       tmpBoolean=Backlight;
@@ -869,47 +821,6 @@ void EnterMenu(int x)
           lcd.print("ON ");
         else
           lcd.print("OFF");
-      }    
-      StayInside = false;      
-      break;
-
-    case 6:
-      lcd.clear();
-      lcd.print(MenuItems[6]);
-      lcd.setCursor(0,1);
-      lcd.print("Serial:         ");
-      tmpBoolean=Debug;
-      waitforkey = true;
-      while (waitforkey)
-      {
-        KeyRead = keypad.getKey();
-        switch (KeyRead)
-        {
-          case '*':
-            tmpBoolean = !(tmpBoolean);
-            break;
-          case '#':
-            tmpBoolean = !(tmpBoolean);
-            break;
-          case 'A':
-            Debug=tmpBoolean;
-            if (Debug)
-              WriteToEEPROM(10,1);
-            else
-              WriteToEEPROM(10,0);
-            waitforkey = false;
-            SavedMessage();            
-            break;
-          case 'D':
-            NotSavedMessage();
-            waitforkey = false;
-            break;
-        }
-        lcd.setCursor(8,1);
-        if (tmpBoolean)
-          lcd.print("Enabled ");
-        else
-          lcd.print("Disabled");
       }    
       StayInside = false;      
       break;
