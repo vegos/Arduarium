@@ -4,7 +4,7 @@
 #include <EEPROM.h>
 #include <MemoryFree.h>
 
-#define  Version  "     2.00b"
+#define  Version  "     2.10 "
 
 
 LiquidCrystal_I2C lcd(0x20,16,2);  // set the LCD address to 0x20 for a 16 chars and 2 line display
@@ -207,7 +207,7 @@ void loop()
     }
     else
     {
-      if (CorrectedDisplayTemp>=(TempThreshold+1))
+      if (CorrectedDisplayTemp<=(TempThreshold-TemperatureDrop))
       {
         FanStatus = false;
         if (FanEnabled)
@@ -739,6 +739,7 @@ void EnterMenu(int x)
       lcd.clear();
       lcd.print(MenuItems[5]);
       //         0123456789012345
+      lcd.setCursor(0,1);
       lcd.print("Temp Drop:   ");
       lcd.print(char(223));
       lcd.print("C ");
@@ -770,7 +771,7 @@ void EnterMenu(int x)
             waitforkey = false;
             break;
         }
-        lcd.setCursor(10,1);
+        lcd.setCursor(11,1);
         if (tmpInteger<10)
           lcd.print("0");
         lcd.print(tmpInteger);
